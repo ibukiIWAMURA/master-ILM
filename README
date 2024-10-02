@@ -1,14 +1,14 @@
 # Master_ILM
 
 ## Experiment
-  - N_GENS = 1000  # 世代数
-  - N_SAMPLES = 40  # 子供が学習するデータ数
+  - N_GENS   # 世代数
+  - N_SAMPLES  # 子供が学習するデータ数
   - INITIAL_LANGUAGE_FILE = "data/100_3_Initial_Language.txt"  # 1世代目の初期言語ファイル
   - SEMANTIC_SPACE_FILE = "data/100_Semantic_Space.txt"  # 2世代目以降の意味空間ファイル
-  - HOLISTIC_RULE_INVENTION_LENGTH = 3  # 文全体のルールの最大長さ
-  - WORD_RULE_INVENTION_LENGTH = 1  # 単語ルールの最大長さ
+  - HOLISTIC_RULE_INVENTION_LENGTH   # 文全体のinventionの形式長
+  - WORD_RULE_INVENTION_LENGTH   # 単語のinventionの形式長
   - RANDOM_SEED = i
-  - ITERATIONS = 3  # 学習アルゴリズムの反復回数
-  - BATCH_SIZE = 1  # 何個ずつバッチに分けて学習するか
-  - MAX_FORM_LENGTH = 9  # 形式の最大長さ
-  - FRONT_KEEP_LENGTH = 6  # 前半に残す長さ
+  - ITERATIONS  # 学習アルゴリズムの反復回数
+  - BATCH_SIZE  # 何個ずつバッチに分けて学習するか
+  - MAX_FORM_LENGTH  # 形式の最大長さ
+  - FRONT_KEEP_LENGTH  # 前半に残す長さ
