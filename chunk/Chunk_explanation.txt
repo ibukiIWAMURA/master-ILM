@@ -1,0 +1,269 @@
+Chunk_original_0には， Chunk_Completedと同じコードがある．
+しかし， それだと実行ができなかったため， GPTにより修正版をChunk.pyに書いてある．
+そして， Chunk.pyを実際の実行で使っている．
+
+このGPTの修正は，　何回か行われている．　そのため， 一番古いものは， _0であり， そこから， _1と増えていく．
+
+単語ルールを入力として時に，　エラーになる．　早急に対処する．
+→ productionで使ってるcluster関数でrule_setからword_rule_setだけ抜き出して， あらかじめchunked_rulesにextendした
+
+
+Chunk_original_3を拡張した，chunkにおける単語ルール作成時の，カテゴリーラベルの選択肢に，ギリシア文字の大文字を追加
+→ def generate_random_label(used_labels):を変更
+
+
+9/19(木)．　iterations==2以上にした時，過剰にchunkするバグを取る
+'S/_admire(x,_bob)/0->vW/x'
+'S/_kick(x,_bob)/0->hE/x'
+<学習後>
+'S/_p(_x,_bob)/0->/p/x', 
+'/_admire->vW', 
+'/_kick->hE', 
+
+9/20(金)．修正
+def preprocess_form(form):
+    # 正規表現で「大文字 + スラッシュ + 小文字 (x, y, p)」をひとつの塊として扱う
+    pattern = re.compile(r'([A-ZΑ-Ω])/(x|y|p)')
+    
+    # 見つかった部分を一時的に特殊文字で置き換える
+    processed_form = form
+    matches = pattern.findall(form)
+    replaced_parts = []
+    
+    for match in matches:
+        # 例えば「W/x」を特殊なトークンに置き換える (例: "_SPECIAL0_")
+        part = f"{match[0]}/{match[1]}"
+        token = f"_SPECIAL{len(replaced_parts)}_"
+        processed_form = processed_form.replace(part, token, 1)
+        replaced_parts.append((token, part))
+    
+    return processed_form, replaced_parts
+
+def postprocess_form(processed_form, replaced_parts):
+    # 特殊トークンを元のカテゴリーラベルセットに戻す
+    for token, original in replaced_parts:
+        processed_form = processed_form.replace(token, original)
+    return processed_form
+
+def split_form_sim_diff_ability(a_form1, a_form2):
+    # まずはフォームを前処理して、カテゴリーラベルセットを特殊トークンに置き換える
+    processed_form1, replaced_parts1 = preprocess_form(a_form1)
+    processed_form2, replaced_parts2 = preprocess_form(a_form2)
+
+    # SequenceMatcher で比較
+    matcher = SequenceMatcher(None, processed_form1, processed_form2)
+    split_form1 = []
+    split_form2 = []
+
+    # get_opcodes()の出力を確認
+    opcodes = matcher.get_opcodes()
+    for tag, i1, i2, j1, j2 in opcodes:
+        part1 = processed_form1[i1:i2]
+        part2 = processed_form2[j1:j2]
+
+        if tag == 'equal':
+            split_form1.append(part1)
+            split_form2.append(part2)
+        elif tag == 'replace':
+            split_form1.append(part1)
+            split_form2.append(part2)
+        elif tag == 'delete':
+            split_form1.append(part1)
+            split_form2.append('')
+        elif tag == 'insert':
+            split_form1.append('')
+            split_form2.append(part2)
+
+    # 空の部分集合を削除
+    split_form1 = [part for part in split_form1 if part]
+    split_form2 = [part for part in split_form2 if part]
+
+    # 結果を元に戻す (トークンを元のカテゴリーラベルセットに復元)
+    split_form1 = [postprocess_form(part, replaced_parts1) for part in split_form1]
+    split_form2 = [postprocess_form(part, replaced_parts2) for part in split_form2]
+
+    return split_form1, split_form2
+    
+    
+9/20(金)
+新たなバグ．
+入力：['S/_admire(_x,_bob)/0->vaW/x', 'S/_kick(_x,_bob)/0->haW/x']
+出力：['S/_p(_x,_bob)/0->aW/paW/x', 'aW/_admire->v', 'aW/_kick->h']
+
+入力：['S/_admire(_x,_bob)/0->vW/x', 'S/_kick(_x,_bob)/0->hW/x']
+出力：['S/_p(_x,_bob)/0->W/pW/x', 'W/_admire->v', 'W/_kick->h']
+
+
+変更点①
+def preprocess_form(form):
+    # 正規表現で「大文字 + スラッシュ + 小文字 (x, y, p)」をひとつの塊として扱う
+    pattern = re.compile(r'([A-ZΑ-Ω])/(x|y|p)')
+    
+    # 見つかった部分を一時的に特殊文字で置き換える
+    processed_form = form
+    matches = pattern.findall(form)
+    replaced_parts = []
+    
+    for match in matches:
+        # 例えば「W/x」を特殊なトークンに置き換える (例: "_XYP0_")
+        part = f"{match[0]}/{match[1]}"
+        token = f"_XYP{len(replaced_parts)}_"
+        processed_form = processed_form.replace(part, token, 1)
+        replaced_parts.append((token, part))
+    
+    return processed_form, replaced_parts
+
+def postprocess_form(processed_form, replaced_parts):
+    # 特殊トークンを元のカテゴリーラベルセットに戻す
+    for token, original in replaced_parts:
+        processed_form = processed_form.replace(token, original)
+    return processed_form
+
+ # トークンを含む要素を分割して、それぞれを独立した要素にする
+def split_token_parts(split_form):
+    final_split_form = []
+    for part in split_form:
+        # 特殊トークンを含んでいる部分を見つけたら、その前後の部分と分割
+        if "_XYP" in part:
+            parts = re.split(r'(_XYP\d+_)', part)
+            final_split_form.extend([p for p in parts if p])  # 空要素を除外
+        else:
+            final_split_form.append(part)
+    return final_split_form
+
+def split_form_sim_diff_ability(a_form1, a_form2):
+    # まずはフォームを前処理して、カテゴリーラベルセットを特殊トークンに置き換える
+    processed_form1, replaced_parts1 = preprocess_form(a_form1)
+    processed_form2, replaced_parts2 = preprocess_form(a_form2)
+
+    # SequenceMatcher で比較
+    matcher = SequenceMatcher(None, processed_form1, processed_form2)
+    split_form1 = []
+    split_form2 = []
+
+    # get_opcodes()の出力を確認
+    opcodes = matcher.get_opcodes()
+    for tag, i1, i2, j1, j2 in opcodes:
+        part1 = processed_form1[i1:i2]
+        part2 = processed_form2[j1:j2]
+
+        if tag == 'equal':
+            split_form1.append(part1)
+            split_form2.append(part2)
+        elif tag == 'replace':
+            split_form1.append(part1)
+            split_form2.append(part2)
+        elif tag == 'delete':
+            split_form1.append(part1)
+            split_form2.append('')
+        elif tag == 'insert':
+            split_form1.append('')
+            split_form2.append(part2)
+
+    # 空の部分集合を削除
+    split_form1 = [part for part in split_form1 if part]
+    split_form2 = [part for part in split_form2 if part]
+    # split_form1 と split_form2 をトークン部分ごとに分割
+    split_form1 = split_token_parts(split_form1)
+    split_form2 = split_token_parts(split_form2)
+
+    # 結果を元に戻す (トークンを元のカテゴリーラベルセットに復元)
+    split_form1 = [postprocess_form(part, replaced_parts1) for part in split_form1]
+    split_form2 = [postprocess_form(part, replaced_parts2) for part in split_form2]
+
+    return split_form1, split_form2
+
+変更点②
+def get_filtered_indices(compare_form_pair_results):
+    filtered_indices_set = []
+    for index, element in enumerate(compare_form_pair_results):
+        if (
+            2 <= len(element) <= 3 and
+            element.count('1') < 2 and
+            # '00' not in element and # 同じものが並んでいる      ---------------------------------ここの条件を外した
+            # '11' not in element and # 異なるものが並んでいる　　 ---------------------------------ここの条件を外した
+            element != '2'
+        ):
+            filtered_indices_set.append(index)
+    return filtered_indices_set
+ 
+しかし，
+入力：['S/_admire(_x,_bob)/0->vaW/x', 'S/_kick(_x,_bob)/0->haW/x']
+出力：['S/_p(_x,_bob)/0->W/paW/x', 'W/_admire->v', 'W/_kick->h']
+→ pのラベル付けがおかしい
+
+解決：Chunk_original_4を更新
+
+
+9/21(土)：バグあり
+入力：S/_p(_eve,_carol)/0->aO/p
+入力：S/_p(_eve,_alice)/0->aΚ/p
+↓
+出力：S/_p(_eve,_y)/0->aO/y
+という学習をする．
+
+但し，注意が必要
+入力：S/_p(_eve,_carol)/0->aO/p
+入力：S/_p(_eve,_alice)/0->aΚ/p
+
+解決
+修正点1
+def compare_forms_by_index_process(split_form_pairs):
+    compare_form_pair_results = []
+    for a_form1_as_list, a_form2_as_list in split_form_pairs:
+        a_compare_form_pair_result = compare_forms_by_index_ability(a_form1_as_list, a_form2_as_list)
+        # compare_form_pair_results.append(a_compare_form_pair_result)
+        compare_form_pair_results.append((a_compare_form_pair_result, a_form1_as_list, a_form2_as_list))  # 各ペアを結果と一緒に保存
+    return compare_form_pair_results
+
+def contains_uppercase_greek_or_latin(character):
+    # ラテン文字の大文字とギリシア文字の大文字に対するチェック
+    return character.isupper() or ('Α' <= character <= 'Ω')
+
+def check_for_uppercase_warning(compare_form_pair_results):
+    for idx, (result, form1_list, form2_list) in enumerate(compare_form_pair_results):
+        for i, char in enumerate(result):
+            if char == '1':  # 差異部分を検出
+                # form1_list[i] と form2_list[i] に大文字のアルファベットまたはギリシア文字が含まれているか確認
+                if contains_uppercase_greek_or_latin(form1_list[i]) or contains_uppercase_greek_or_latin(form2_list[i]):
+                    # print(f"Warning: Uppercase letter or Greek letter found at index {i} in form pair.")
+                    # print(f"Form1: {form1_list[i]}, Form2: {form2_list[i]}")
+                    
+                    # ここでa_compare_form_pair_result（つまり result）を'2'に変更
+                    compare_form_pair_results[idx] = ('2', form1_list, form2_list)
+
+修正2  :   def chunk_learning(rule_set):の中身
+# 新しい部分
+    compare_form_pair_results = compare_forms_by_index_process(split_form_pairs)
+    check_for_uppercase_warning(compare_form_pair_results)
+    result_indices = get_filtered_indices([result for result, _, _ in compare_form_pair_results])
+
+    # 古い部分
+    # form_pair_results = compare_forms_by_index_process(split_form_pairs)    
+    # result_indices = get_filtered_indices(form_pair_results)
+    
+    
+    
+9/26(木)：過剰学習　単語ルールに変数
+入力：['S/_p(_bob,_david)/0->jQ/p', 'S/_p(_bob,_alice)/0->jU/p']
+出力：['S/_p(_bob,_y)/0->jQ/y', 'Q/_david->Q/p', 'Q/_alice->U/p']
+
+修正：def check_for_uppercase_warning(compare_form_pair_results):の中身の1行のみ修正
+以前：if contains_uppercase_greek_or_latin(form1_list[i]) or contains_uppercase_greek_or_latin(form2_list[i]):
+以後：if any(contains_uppercase_greek_or_latin(c) for c in form1_list[i]) or any(contains_uppercase_greek_or_latin(c) for c in form2_list[i]):
+                   
+
+9/23(月)．設定不良：カテゴリーラベルが足りなくなる．
+
+
+10/1(火). IndexError: list index out of range
+--> 436 form_of_scheme_rule[form_diff[0]] = f'{label}/{var[1]}
+これは，引数が
+rule_set = ['S/_p(_bob,_carol)/0->dbbwhenzoihuddΙ/xzeoffq', 'S/_p(_bob,_alice)/0->dbbwhenzoihuddΙ/xzeoffq']
+のように，形式が全く同じであり，かつ
+compare_form_pair_results = [('000', ['dbbwhenzoihudd', 'Ι/x', 'zeoffq'], ['dbbwhenzoihudd', 'Ι/x', 'zeoffq'])]
+のように，formの差異（1）・類似（0）を示す数値の並びに対する制限がなかった．
+そのため，
+修正点：関数def get_filtered_indices(compare_form_pair_results):
+→  not all(c == '0' for c in element)  # すべてが0である場合は対象外
+を追加Chunk.original_7.pyを修正
