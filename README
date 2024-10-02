@@ -10,5 +10,5 @@
   - RANDOM_SEED = i
   - ITERATIONS  # 学習アルゴリズムの反復回数
   - BATCH_SIZE  # 何個ずつバッチに分けて学習するか
-  - MAX_FORM_LENGTH  # 形式の最大長さ
-  - FRONT_KEEP_LENGTH  # 前半に残す長さ
+  - MAX_FORM_LENGTH  # 形式がこの長さを超えると
+  - FRONT_KEEP_LENGTH  # この長さに短縮する
