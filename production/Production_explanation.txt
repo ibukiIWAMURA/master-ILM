@@ -1,0 +1,87 @@
+何世代分も回すと，以下のエラーが出るため，エラーを単純に回避（continue）するようにした
+→ Production_original_3を変更した
+
+--------------------------------------------------------------------------
+ValueError                                Traceback (most recent call last)
+Cell In[4], line 75
+     72 semantic_space_file = "data/100_Semantic_Space.txt"
+     74 # シミュレーションの実行
+---> 75 parent_production, child_memory, meanings_for_production = simulate_language_evolution(
+     76     n_gens=100, 
+     77     n_samples=40, 
+     78     initial_language=initial_language_file, 
+     79     semantic_space_file=semantic_space_file
+     80 )
+     82 # 結果の表示
+     83 print("最終世代の発話:", parent_production)
+
+Cell In[4], line 58, in simulate_language_evolution(n_gens, n_samples, initial_language, semantic_space_file)
+     55 print(f"{generation}世代目の発話指令:", meanings_for_production)
+     57 # 子供のメモリに基づいて親が発話
+---> 58 parent.production = parent.produce_language(child.memory, meanings_for_production)
+     59 print(f"{generation}世代目の発話:", parent.production)
+     61 # 子供がその発話を学習
+
+Cell In[4], line 29, in Agent.produce_language(self, rule_set, only_sem_express_set_for_production)
+     27 def produce_language(self, rule_set, only_sem_express_set_for_production):
+     28     # print(f"Agent {self.name} が発話時に使用するメモリ: {rule_set}")
+---> 29     self.production = Production.produce(rule_set, only_sem_express_set_for_production)
+     30     return self.production
+
+File ~/master_ILM/production/Production.py:424, in produce(rule_set, only_sem_express_set_for_production)
+    420 production_ingredients = process_and_return_production_ingredients(command_with_info_list, word_rule_set)
+    423 # 生成された文規則
+--> 424 generated_rules = generate_all_sentence_rules(production_ingredients)
+    425 generated_rules.extend(invented_rules_from_only_command_list)
+    427 return generated_rules
+
+File ~/master_ILM/production/Production.py:390, in generate_all_sentence_rules(production_ingredients)
+    388 for pair_and_vars in production_ingredients:
+    389     best_pair, word_variable_and_sem_express_pairs = pair_and_vars
+--> 390     rule = generate_sentence_rule(best_pair, word_variable_and_sem_express_pairs)
+    391     generated_rules.append(rule)
+    393 return generated_rules
+
+File ~/master_ILM/production/Production.py:383, in generate_sentence_rule(best_pair, word_variable_and_sem_express_pairs)
+    381     return f"{meaning_part[0]}/" + f"{meaning_part[1]}" + "(" + ",".join(meaning_part[2:-1]) + ")" + meaning_part[-1] + "->" + "".join(form_part)
+    382 else:
+--> 383     return combine_word_and_variable_ability(best_pair, word_variable_and_sem_express_pairs)
+
+File ~/master_ILM/production/Production.py:352, in combine_word_and_variable_ability(an_only_one_diff_in_sem_pair, word_variable_and_sem_express_pairs)
+    349                 new_meaning[i] = word_meaning.split('/')[1]
+    351 for var_pos, word_rule in word_variable_and_sem_express_pairs:
+--> 352     category_label_and_sem_express, word_meaning_form = word_rule.split('->')
+    353     word_form = word_meaning_form
+    354     category_label = category_label_and_sem_express.split('/')[0]
+
+ValueError: not enough values to unpack (expected 2, got 1)
+
+
+
+Production_original_4を変更
+→関数def combine_word_and_variable_abilityにおける，if文の中身 == 3を == 2に変更する
+この部分は
+        # 'word_variable_and_sem_express_pairs' の長さが3であり、かつ、すべてのペアが同じ形式表現（pair[1]）を持っている場合。
+        # 'all(pair[1] == word_variable_and_sem_express_pairs[0][1] for pair in word_variable_and_sem_express_pairs)' の部分は
+        # 各ペアの形式表現部分（pair[1]）が最初のペアの形式表現（word_variable_and_sem_express_pairs[0][1]）と等しいかどうかを確認しています。
+これをしている
+
+
+10/1(火). 
+文全体ルールと単語ルールのinventionの形式長をパラメータ化する．
+完了
+
+10/2(水)．
+形式長を切る．以下の関数を追加
+# 新たに追加する関数
+def shoten_too_long_form_ability(generated_rules, max_length=9, front_keep_length=6):
+    """
+    形式長が max_length 以上の場合に、前半の front_keep_length 文字を残して後ろを切り捨てる関数。
+    """
+    shortened_rules = []
+    for rule in generated_rules:
+        semantic_structure, form = parse_rule(rule)
+        if len(form) >= max_length:
+            form = form[:front_keep_length]  # 後ろの部分を切り捨て
+        shortened_rules.append(f"{semantic_structure}->{form}")
+    return shortened_rules
