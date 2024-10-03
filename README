@@ -1,5 +1,8 @@
 # Master_ILM
 
+## outフォルダ
+  - 空のoutフォルダを作っておく
+
 ## Experiment
   - N_GENS   # 世代数
   - N_SAMPLES  # 子供が学習するデータ数
