@@ -3,8 +3,9 @@
 ## outフォルダ
   - 空のoutフォルダを作っておく
 
-## 全体を回す
-ILM_practice_発話.ipynbの中で回す
+## 全体を回す (2通りある)
+  - ILM_practice_発話.ipynbで回す
+  - src/iterated_learning.pyで回す
 
 ## Experiment
   - N_GENS   # 世代数
