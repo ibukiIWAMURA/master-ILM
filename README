@@ -3,6 +3,9 @@
 ## outフォルダ
   - 空のoutフォルダを作っておく
 
+## 全体を回す
+ILM_practice_発話.ipynbの中で回す
+
 ## Experiment
   - N_GENS   # 世代数
   - N_SAMPLES  # 子供が学習するデータ数
