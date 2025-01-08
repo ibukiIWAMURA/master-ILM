@@ -1,0 +1,71 @@
+9/19(木)．設計ミス発覚
+W/_john->abc
+W/_mary->def
+E/_john->bac
+E/_luth->opq
+
+であるとき，W/_john->abcとE/_john->bacが学習対象である．
+仮に，ラベル " E " に統合されたならば，これまで " W " だった単語ルール全てが " E "に変わる
+つまり，
+E/_john->abc
+E/_mary->def
+E/_luth->opq
+になる．
+
+9.21(土)．設計ミスの修正：カテゴリーの統一を完了
+
+11/5(火)．適用回数
+
+11/12(火). 深夜
+カテゴリーラベルにおいて，batch単位で学習していくと，batchを跨いでカテゴリーが統合されないということが起きていたので，解消
+draft_ipynbの中の，category_trial.ipynbを参照
+GPTに投げた要求文
+「しかしながら，batchの個数によって，困った事態が想定されます．
+つまり，batch_size = 2として，rule_set = [
+    'S/_eat(_x,_david)/0->jN/xu', 'N/_carol->v', 'Σ/_carol->v', 
+    'S/_eat(_x,_david)/0->jΣ/xm', 'N/_alice->a'
+]
+という場合，2つずつ学習アルゴリズムを適用していくわけですが，
+2回目にbatchを取得して，rule_setの中身が，
+rule_set = ['S/_eat(_x,_david)/0->jN/xu', 'N/_carol->v', 'Σ/_carol->v',  'S/_eat(_x,_david)/0->jΣ/xm']
+である場合，'N/_carol->v', 'Σ/_carol->v'をcategory_integrationの適用対象であり，出力結果が'Σ/_carol->v'と，統合されるカテゴリーラベルがΣとなった場合，rule_set全体の出力は，
+rule_set = ['S/_eat(_x,_david)/0->jΣ/xu', 'Σ/_carol->v',  'S/_eat(_x,_david)/0->jΣ/xm']
+となるはずである．
+ここまでは良い．
+しかしながら，次にbatchを取得するときに，'N/_alice->a'これが追加される．前まではカテゴリーラベルをNからΣに全て書き換えるという処理をしたにも関わらず，'N/_alice->a'これが追加された後では，そのような処理があったことが受け継がれずに，'N/_alice->a'のまま出力される．
+実際に，['Σ/_carol->v', 'N/_alice->a', 'S/_eat(_x,_david)/0->jΣ/xu', 'S/_eat(_x,_david)/0->jΣ/xm']という結果が出力されてしまった．
+batchを設けなければ，['Σ/_carol->v', 'Σ/_alice->a', 'S/_eat(_x,_david)/0->jΣ/xu', 'S/_eat(_x,_david)/0->jΣ/xm']という結果が出力されるはずである（カテゴリーラベルの統一がΣではなく，Nの場合もあり得る）．
+このようにbatchを設けたとしても，batchの境界を超えてカテゴリーラベルが統一されるようにしてほしいです，
+このような処理は可能でしょうか？どのように修正すれば良いか教えてください．」
+
+
+
+11/12
+W/_carol->W/pが存在するので，エラーが発生している．
+デバッグ処理のため，修正した関数
+# def split_word_rule(word_rule):
+#     category_label, rest = word_rule.split('/')
+#     meaning, form = rest.split('->')
+#     return [category_label, meaning, form]
+
+
+def split_word_rule(word_rule):
+    try:
+        category_label, rest = word_rule.split('/')
+        meaning, form = rest.split('->')
+        return [category_label, meaning, form]
+    except ValueError as e:
+        print(f"Error processing rule: {word_rule}")
+        raise e
+
+
+11/24(日)
+iterationをしない．そのため，11/12深夜に修正した，iteration2回目で発生する可能性のあるbatch越境の問題は，そもそも発生させないようにした．
+
+11/27(水)．深夜
+根本的な修正：integrable_pairsを集計し，最初のペアのみだけを処理する．更新された単語＋文ルールを，再びrule_setとして最初から処理をかける．またintegrable_pairsを集計する．なくなるまでやる．
+def update_word_and_sentence_rules(word_rule_set, sentence_rule_set, integrable_pairs):
+と
+def category_integration_learning(rule_set):
+を修正．
+詳しくは，too_strong_category.ipynbを参照
