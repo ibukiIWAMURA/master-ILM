@@ -1,0 +1,7 @@
+12/30：「分節化アルゴリズム」をibuki_Nに移植
+Ibuki_1_TopSimに関して
+chunkの「分節化アルゴリズム」を搭載
+古い：def split_form_ability(form1, form2):
+沢山の関数群＋後半の関数名を変更
+
+Ibuki_2_TopSimも変更
